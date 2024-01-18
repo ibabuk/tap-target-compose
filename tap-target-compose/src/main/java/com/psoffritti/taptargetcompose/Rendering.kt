@@ -24,6 +24,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
@@ -58,6 +59,7 @@ private val TARGET_PADDING = 20.dp
 
 /** The horizontal margin for the text block */
 private val TEXT_HORIZONTAL_MARGIN = 40.dp
+
 /** The vertical margin for the text block */
 private val TEXT_VERTICAL_MARGIN = 40.dp
 
@@ -77,242 +79,280 @@ private const val LOG_TAG = "TapTarget"
 /** Composable responsible for drawing the tap target. */
 @Composable
 internal fun TapTargetContent(tapTarget: TapTarget, onComplete: () -> Unit) {
-  val density = LocalDensity.current
-  val screenSizePx = Size(
-    LocalConfiguration.current.screenWidthDp * density.density,
-    LocalConfiguration.current.screenHeightDp * density.density
-  )
+    val density = LocalDensity.current
+    val screenSizePx = Size(
+        LocalConfiguration.current.screenWidthDp * density.density,
+        LocalConfiguration.current.screenHeightDp * density.density
+    )
 
-  val targetRectPx = tapTarget.coordinates.boundsInWindow()
+    val targetRectPx = tapTarget.coordinates.boundsInWindow()
 
-  val targetMaxDimensionPx = max(
-    tapTarget.coordinates.size.width,
-    tapTarget.coordinates.size.height
-  )
-  val targetRadiusPx = targetMaxDimensionPx / 2 + TARGET_PADDING.toPx(density)
+    val targetMaxDimensionPx = max(
+        tapTarget.coordinates.size.width,
+        tapTarget.coordinates.size.height
+    )
+    val targetRadiusPx = targetMaxDimensionPx / 2 + TARGET_PADDING.toPx(density)
 
-  // The radius of the outer circle of the tap target.
-  var outerCircleRadiusPx by remember { mutableFloatStateOf(0f) }
-  // The radius of the highlight circle shown around the target.
-  var highlightCircleRadiusPx by remember { mutableFloatStateOf(0f) }
-  // Whether we are animating in or out.
-  var animateIn by remember { mutableStateOf(true) }
-  // Whether the user clicked the target.
-  var targetClicked by remember { mutableStateOf(false) }
-  // Whether the user clicked outside the target.
-  var targetCancelled by remember { mutableStateOf(false) }
+    // The radius of the outer circle of the tap target.
+    var outerCircleRadiusPx by remember { mutableFloatStateOf(0f) }
+    // The radius of the highlight circle shown around the target.
+    var highlightCircleRadiusPx by remember { mutableFloatStateOf(0f) }
+    // Whether we are animating in or out.
+    var animateIn by remember { mutableStateOf(true) }
+    // Whether the user clicked the target.
+    var targetClicked by remember { mutableStateOf(false) }
+    // Whether the user clicked outside the target.
+    var targetCancelled by remember { mutableStateOf(false) }
 
-  val outerCircleAnimatable = remember { Animatable(0f) }
-  val highlightCircleAnimatable = remember { Animatable(0f) }
-  val tapTargetCircleAnimatable = remember { Animatable(0f) }
-  val textAlphaAnimatable = remember { Animatable(0f) }
+    val outerCircleAnimatable = remember { Animatable(0f) }
+    val highlightCircleAnimatable = remember { Animatable(0f) }
+    val tapTargetCircleAnimatable = remember { Animatable(0f) }
+    val textAlphaAnimatable = remember { Animatable(0f) }
 
-  if (targetClicked) {
-    // The user tapped the target, notify the target.
-    tapTarget.onTargetClick()
-    targetClicked = false
-  }
-
-  if (
-    // We have completed the current target, and are now animating out.
-    !animateIn &&
-    // The outer circle has finished collapsing.
-    outerCircleAnimatable.value == 0f &&
-    // The highlight circle has finished collapsing.
-    highlightCircleAnimatable.value == 0f
-  ) {
-    // Animate out is complete. We are now switching to the next target and should animate in.
-    animateIn = true
-
-    if (targetCancelled) {
-      // The user tapped outside the target, notify the target.
-      tapTarget.onTargetCancel()
-      targetCancelled = false
+    if (targetClicked) {
+        // The user tapped the target, notify the target.
+        tapTarget.onTargetClick()
+        targetClicked = false
     }
 
-    // The animation is complete, notify that we are ready for the next target.
-    onComplete()
-  }
+    if (
+    // We have completed the current target, and are now animating out.
+        !animateIn &&
+        // The outer circle has finished collapsing.
+        outerCircleAnimatable.value == 0f &&
+        // The highlight circle has finished collapsing.
+        highlightCircleAnimatable.value == 0f
+    ) {
+        // Animate out is complete. We are now switching to the next target and should animate in.
+        animateIn = true
 
-  if (animateIn) {
-    AnimateIn(
-      tapTarget,
-      outerCircleAnimatable,
-      highlightCircleAnimatable,
-      tapTargetCircleAnimatable,
-      textAlphaAnimatable
+        if (targetCancelled) {
+            // The user tapped outside the target, notify the target.
+            tapTarget.onTargetCancel()
+            targetCancelled = false
+        }
+
+        // The animation is complete, notify that we are ready for the next target.
+        onComplete()
+    }
+
+    if (animateIn) {
+        AnimateIn(
+            tapTarget,
+            outerCircleAnimatable,
+            highlightCircleAnimatable,
+            tapTargetCircleAnimatable,
+            textAlphaAnimatable
+        )
+    } else {
+        AnimateOut(
+            tapTarget,
+            outerCircleAnimatable,
+            highlightCircleAnimatable,
+            textAlphaAnimatable
+        )
+    }
+
+    val maxTextWidthPx = MAX_TEXT_WIDTH.toPx(density)
+    val textHorizontalMarginPx = TEXT_HORIZONTAL_MARGIN.toPx(density)
+    val textVerticalMarginPx = TEXT_VERTICAL_MARGIN.toPx(density)
+
+    val textWidthPx = min(screenSizePx.width, maxTextWidthPx) - textHorizontalMarginPx * 2
+
+    val constraints = Constraints.fixedWidth(textWidthPx.toInt())
+    val textMeasurer = rememberTextMeasurer()
+    val titleMeasure = tapTarget.title.rememberMeasure(textMeasurer, constraints)
+    val descriptionMeasure = tapTarget.description.rememberMeasure(textMeasurer, constraints)
+
+    val textBlockHeightPx = titleMeasure.size.height +
+            descriptionMeasure.size.height +
+            TEXT_SPACING.toPx(density)
+
+    val textBlockTopLeft = getTextBlockOffset(
+        Size(textWidthPx, textBlockHeightPx),
+        screenSizePx,
+        targetRectPx.center,
+        targetRadiusPx,
+        textHorizontalMarginPx,
+        textVerticalMarginPx
     )
-  }
-  else {
-    AnimateOut(
-      tapTarget,
-      outerCircleAnimatable,
-      highlightCircleAnimatable,
-      textAlphaAnimatable
+    val textBlockRect = Rect(
+        textBlockTopLeft.x,
+        textBlockTopLeft.y,
+        textBlockTopLeft.x + textWidthPx,
+        textBlockTopLeft.y + textBlockHeightPx
     )
-  }
 
-  val maxTextWidthPx = MAX_TEXT_WIDTH.toPx(density)
-  val textHorizontalMarginPx = TEXT_HORIZONTAL_MARGIN.toPx(density)
-  val textVerticalMarginPx = TEXT_VERTICAL_MARGIN.toPx(density)
+    val topLeftRadius = textBlockRect.topLeft.distanceTo(targetRectPx.center)
+    val topRightRadius = textBlockRect.topRight.distanceTo(targetRectPx.center)
+    val bottomLeftRadius = textBlockRect.bottomLeft.distanceTo(targetRectPx.center)
+    val bottomRightRadius = textBlockRect.bottomRight.distanceTo(targetRectPx.center)
+    val maxRadius = max(
+        topLeftRadius,
+        topRightRadius,
+        bottomLeftRadius,
+        bottomRightRadius
+    )
 
-  val textWidthPx = min(screenSizePx.width, maxTextWidthPx) - textHorizontalMarginPx * 2
+    outerCircleRadiusPx = maxRadius + OUTER_CIRCLE_INTERNAL_MARGIN.toPx(density)
+    highlightCircleRadiusPx = min(targetRadiusPx * 2, outerCircleRadiusPx)
 
-  val constraints = Constraints.fixedWidth(textWidthPx.toInt())
-  val textMeasurer = rememberTextMeasurer()
-  val titleMeasure = tapTarget.title.rememberMeasure(textMeasurer, constraints)
-  val descriptionMeasure = tapTarget.description.rememberMeasure(textMeasurer, constraints)
-
-  val textBlockHeightPx = titleMeasure.size.height +
-          descriptionMeasure.size.height +
-          TEXT_SPACING.toPx(density)
-
-  val textBlockTopLeft = getTextBlockOffset(
-    Size(textWidthPx, textBlockHeightPx),
-    screenSizePx,
-    targetRectPx.center,
-    targetRadiusPx,
-    textHorizontalMarginPx,
-    textVerticalMarginPx
-  )
-  val textBlockRect = Rect(
-    textBlockTopLeft.x,
-    textBlockTopLeft.y,
-    textBlockTopLeft.x + textWidthPx,
-    textBlockTopLeft.y + textBlockHeightPx
-  )
-
-  val topLeftRadius = textBlockRect.topLeft.distanceTo(targetRectPx.center)
-  val topRightRadius = textBlockRect.topRight.distanceTo(targetRectPx.center)
-  val bottomLeftRadius = textBlockRect.bottomLeft.distanceTo(targetRectPx.center)
-  val bottomRightRadius = textBlockRect.bottomRight.distanceTo(targetRectPx.center)
-  val maxRadius = max(
-    topLeftRadius,
-    topRightRadius,
-    bottomLeftRadius,
-    bottomRightRadius
-  )
-
-  outerCircleRadiusPx = maxRadius + OUTER_CIRCLE_INTERNAL_MARGIN.toPx(density)
-  highlightCircleRadiusPx = min(targetRadiusPx*2, outerCircleRadiusPx)
-
-  Render(
-    tapTarget,
-    onTargetCancel = {
-      targetCancelled = true
-      animateIn = false
-    },
-    onTargetClick = {
-      targetClicked = true
-      animateIn = false
-    },
-    outerCircleScale = outerCircleAnimatable.value,
-    highlightCircleScale = highlightCircleAnimatable.value,
-    tapTargetCircleScale = tapTargetCircleAnimatable.value,
-    targetCenter = targetRectPx.center,
-    targetRadius = targetRadiusPx,
-    outerCircleRadius = outerCircleRadiusPx,
-    highlightCircleRadius = highlightCircleRadiusPx,
-    textBlockTopLeft = textBlockTopLeft,
-    titleMeasure = titleMeasure,
-    descriptionMeasure = descriptionMeasure,
-    textBlockRect = textBlockRect,
-    textAlpha = textAlphaAnimatable.value
-  )
+    Render(
+        tapTarget,
+        onTargetCancel = {
+            targetCancelled = true
+            animateIn = false
+        },
+        onTargetClick = {
+            targetClicked = true
+            animateIn = false
+        },
+        outerCircleScale = outerCircleAnimatable.value,
+        highlightCircleScale = highlightCircleAnimatable.value,
+        tapTargetCircleScale = tapTargetCircleAnimatable.value,
+        targetCenter = targetRectPx,
+        targetRadius = targetRadiusPx,
+        outerCircleRadius = outerCircleRadiusPx,
+        highlightCircleRadius = highlightCircleRadiusPx,
+        textBlockTopLeft = textBlockTopLeft,
+        titleMeasure = titleMeasure,
+        descriptionMeasure = descriptionMeasure,
+        textBlockRect = textBlockRect,
+        textAlpha = textAlphaAnimatable.value
+    )
 }
 
 @Composable
 private fun Render(
-  tapTarget: TapTarget,
-  onTargetClick: () -> Unit,
-  onTargetCancel: () -> Unit,
-  textAlpha: Float,
-  outerCircleScale: Float,
-  highlightCircleScale: Float,
-  tapTargetCircleScale: Float,
-  targetCenter: Offset,
-  targetRadius: Float,
-  outerCircleRadius: Float,
-  highlightCircleRadius: Float,
-  textBlockTopLeft: Offset,
-  titleMeasure: TextLayoutResult,
-  descriptionMeasure: TextLayoutResult,
-  textBlockRect: Rect
+    tapTarget: TapTarget,
+    onTargetClick: () -> Unit,
+    onTargetCancel: () -> Unit,
+    textAlpha: Float,
+    outerCircleScale: Float,
+    highlightCircleScale: Float,
+    tapTargetCircleScale: Float,
+    targetCenter: Rect,
+    targetRadius: Float,
+    outerCircleRadius: Float,
+    highlightCircleRadius: Float,
+    textBlockTopLeft: Offset,
+    titleMeasure: TextLayoutResult,
+    descriptionMeasure: TextLayoutResult,
+    textBlockRect: Rect
 ) {
-  Overlay(key = tapTarget) {
-    Canvas(
-      modifier = Modifier
-        .fillMaxSize()
-        .pointerInput(tapTarget) {
-          detectTapGestures { tapOffset ->
-            when {
-              tapOffset.isOutsideCircle(targetCenter, outerCircleRadius) -> {
-                // The user clicked outside the target
-                onTargetCancel()
-              }
+    Overlay(key = tapTarget) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(tapTarget) {
+                    detectTapGestures { tapOffset ->
+                        when {
+                            tapOffset.isOutsideCircle(targetCenter.center, outerCircleRadius) -> {
+                                // The user clicked outside the target
+                                onTargetCancel()
+                            }
 
-              tapOffset.isInsideCircle(targetCenter, targetRadius) -> {
-                // The user clicked the target
-                onTargetClick()
-              }
+                            tapOffset.isInsideCircle(targetCenter.center, targetRadius) -> {
+                                // The user clicked the target
+                                onTargetClick()
+                            }
+                        }
+                    }
+                } // Add transparency to the entire canvas, so we can show what's below the tap target area.
+                .graphicsLayer(alpha = 0.99f)
+        ) {
+            // Don't draw the circles if they are smaller than the targetRadius.
+            // Otherwise we would draw above the tap target during animation.
+            if (outerCircleRadius * outerCircleScale < targetRadius) {
+                return@Canvas
             }
-          }
-        } // Add transparency to the entire canvas, so we can show what's below the tap target area.
-        .graphicsLayer(alpha = 0.99f)
-    ) {
-      // Don't draw the circles if they are smaller than the targetRadius.
-      // Otherwise we would draw above the tap target during animation.
-      if (outerCircleRadius * outerCircleScale < targetRadius) {
-        return@Canvas
-      }
 
-      // Draw outer circle
-      drawCircle(
-        center = targetCenter,
-        radius = outerCircleRadius * outerCircleScale,
-        color = tapTarget.style.backgroundColor,
-        alpha = tapTarget.style.backgroundAlpha
-      )
+            // Draw outer circle
+            drawCircle(
+                center = targetCenter.center,
+                radius = outerCircleRadius * outerCircleScale,
+                color = tapTarget.style.backgroundColor,
+                alpha = tapTarget.style.backgroundAlpha
+            )
 
-      // Draw highlight circle
-      drawCircle(
-        center = targetCenter,
-        radius = highlightCircleRadius * highlightCircleScale,
-        color = tapTarget.style.tapTargetHighlightColor,
-        alpha = 1 - highlightCircleScale.pow(4)
-      )
+            // Draw highlight circle
+            if (tapTarget.style.tapTargetShape == TapTargetShape.CIRCLE) {
+                drawCircle(
+                    center = targetCenter.center,
+                    radius = highlightCircleRadius * highlightCircleScale,
+                    color = tapTarget.style.tapTargetHighlightColor,
+                    alpha = 1 - highlightCircleScale.pow(4)
+                )
+            } else {
+                val size = targetCenter.size
+                val newSize = targetCenter.size * highlightCircleScale
 
-      // XOR circle used to reveal the tap target, since we are drawing the other circles above it.
-      drawCircle(
-        center = targetCenter,
-        radius = targetRadius + ((targetRadius / 10) * tapTargetCircleScale),
-        color = tapTarget.style.tapTargetHighlightColor,
-        blendMode = BlendMode.Xor
-      )
+                val newLeft = targetCenter.left - (newSize.width / 2)
+                val newTop = targetCenter.top - (newSize.height / 2)
 
-      drawText(
-        textLayoutResult = titleMeasure,
-        topLeft = textBlockTopLeft,
-        alpha = textAlpha.pow(2)
-      )
-      drawText(
-        textLayoutResult = descriptionMeasure,
-        topLeft = textBlockTopLeft.plus(
-          Offset(x = 0f, y = titleMeasure.size.height + TEXT_SPACING.toPx())
-        ),
-        alpha = textAlpha.pow(2)
-      )
+                val radius = 15.dp.value
 
-      if (DEBUG) {
-        // Draw the text block rect to see text bounds.
-        drawRect(
-          color = Color.Black.copy(alpha = 0.4f),
-          topLeft = textBlockRect.topLeft,
-          size = Size(textBlockRect.width, textBlockRect.height)
-        )
-      }
+                drawRoundRect(
+                    color = tapTarget.style.tapTargetHighlightColor,
+                    alpha = 1 - highlightCircleScale.pow(4),
+                    topLeft = Offset(newLeft, newTop),
+                    size = Size(size.width + newSize.width, size.height + newSize.height),
+                    cornerRadius = CornerRadius(radius, radius)
+                )
+            }
+
+            // XOR circle used to reveal the tap target, since we are drawing the other circles above it.
+            if (tapTarget.style.tapTargetShape == TapTargetShape.CIRCLE) {
+                drawCircle(
+                    center = targetCenter.center,
+                    radius = targetRadius + ((targetRadius / 10) * tapTargetCircleScale),
+                    color = tapTarget.style.tapTargetHighlightColor,
+                    blendMode = BlendMode.Xor
+                )
+            } else {
+                val width = targetCenter.width
+                val height = targetCenter.height
+
+                val newWidth = ((width / 10) * tapTargetCircleScale)
+                val newHeight = ((height / 10) * tapTargetCircleScale)
+
+                val newLeft = targetCenter.left - (newWidth / 2)
+                val newTop = targetCenter.top - (newHeight / 2)
+
+                val radius = 15.dp.value
+
+                drawRoundRect(
+                    color = tapTarget.style.tapTargetHighlightColor,
+                    topLeft = Offset(newLeft, newTop),
+                    size = Size(width + newWidth, height + newHeight),
+                    cornerRadius = CornerRadius(radius, radius),
+                    blendMode = BlendMode.Xor
+                )
+            }
+
+            drawText(
+                textLayoutResult = titleMeasure,
+                topLeft = textBlockTopLeft,
+                alpha = textAlpha.pow(2)
+            )
+            drawText(
+                textLayoutResult = descriptionMeasure,
+                topLeft = textBlockTopLeft.plus(
+                    Offset(x = 0f, y = titleMeasure.size.height + TEXT_SPACING.toPx())
+                ),
+                alpha = textAlpha.pow(2)
+            )
+
+            if (DEBUG) {
+                // Draw the text block rect to see text bounds.
+                drawRect(
+                    color = Color.Black.copy(alpha = 0.4f),
+                    topLeft = textBlockRect.topLeft,
+                    size = Size(textBlockRect.width, textBlockRect.height)
+                )
+            }
+        }
     }
-  }
 }
 
 /**
@@ -324,139 +364,137 @@ private fun Render(
  * @param verticalMargin The vertical margin between the text block and the screen edge.
  */
 private fun getTextBlockOffset(
-  textBlockSize: Size,
-  screenSize: Size,
-  targetCenter: Offset,
-  targetRadius: Float,
-  horizontalMargin: Float,
-  verticalMargin: Float
+    textBlockSize: Size,
+    screenSize: Size,
+    targetCenter: Offset,
+    targetRadius: Float,
+    horizontalMargin: Float,
+    verticalMargin: Float
 ): Offset {
-  // The X coordinate of the text block, if positioned to the left of the target.
-  val xLeft = max(targetCenter.x - textBlockSize.width, horizontalMargin)
-  // The X coordinate of the text block, if positioned to the right of the target.
-  val xRightTemp = targetCenter.x
-  val xRight = if (xRightTemp + textBlockSize.width > screenSize.width - horizontalMargin) {
-    // The text block would end outside of the margin. Make sure it doesn't.
-    screenSize.width - horizontalMargin - textBlockSize.width
-  }
-  else {
-    xRightTemp
-  }
+    // The X coordinate of the text block, if positioned to the left of the target.
+    val xLeft = max(targetCenter.x - textBlockSize.width, horizontalMargin)
+    // The X coordinate of the text block, if positioned to the right of the target.
+    val xRightTemp = targetCenter.x
+    val xRight = if (xRightTemp + textBlockSize.width > screenSize.width - horizontalMargin) {
+        // The text block would end outside of the margin. Make sure it doesn't.
+        screenSize.width - horizontalMargin - textBlockSize.width
+    } else {
+        xRightTemp
+    }
 
-  val xOffset = if (xLeft > 0) {
-    xLeft
-  }
-  else {
-    xRight
-  }
+    val xOffset = if (xLeft > 0) {
+        xLeft
+    } else {
+        xRight
+    }
 
-  // The Y coordinate of the text block, if positioned above the target.
-  val yTop = targetCenter.y - targetRadius - textBlockSize.height - verticalMargin
-  // The Y coordinate of the text block, if positioned below the target.
-  val yBottom = targetCenter.y + targetRadius + verticalMargin
+    // The Y coordinate of the text block, if positioned above the target.
+    val yTop = targetCenter.y - targetRadius - textBlockSize.height - verticalMargin
+    // The Y coordinate of the text block, if positioned below the target.
+    val yBottom = targetCenter.y + targetRadius + verticalMargin
 
-  val yOffset = if (yTop > 0) {
-    yTop
-  } else {
-    yBottom
-  }
+    val yOffset = if (yTop > 0) {
+        yTop
+    } else {
+        yBottom
+    }
 
-  return Offset(xOffset, yOffset)
+    return Offset(xOffset, yOffset)
 }
 
 @Composable
 private fun AnimateIn(
-  tapTarget: TapTarget,
-  outerCircleAnimatable: Animatable<Float, AnimationVector1D>,
-  highlightCircleAnimatable: Animatable<Float, AnimationVector1D>,
-  tapTargetCircleAnimatable: Animatable<Float, AnimationVector1D>,
-  textAlphaAnimatable: Animatable<Float, AnimationVector1D>
+    tapTarget: TapTarget,
+    outerCircleAnimatable: Animatable<Float, AnimationVector1D>,
+    highlightCircleAnimatable: Animatable<Float, AnimationVector1D>,
+    tapTargetCircleAnimatable: Animatable<Float, AnimationVector1D>,
+    textAlphaAnimatable: Animatable<Float, AnimationVector1D>
 ) {
-  // Outer circle
-  LaunchedEffect(tapTarget) {
-    outerCircleAnimatable.animateTo(
-      targetValue = 1f,
-      animationSpec = tween(
-        durationMillis = 300,
-        easing = FastOutSlowInEasing,
-      ),
-    )
-  }
+    // Outer circle
+    LaunchedEffect(tapTarget) {
+        outerCircleAnimatable.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(
+                durationMillis = 300,
+                easing = FastOutSlowInEasing,
+            ),
+        )
+    }
 
-  // Highlight circle
-  LaunchedEffect(tapTarget) {
-    highlightCircleAnimatable.animateTo(
-      targetValue = 1f,
-      animationSpec = infiniteRepeatable(
-        animation = tween(1000, easing = FastOutSlowInEasing),
-        repeatMode = RepeatMode.Restart,
-      )
-    )
-  }
+    // Highlight circle
+    LaunchedEffect(tapTarget) {
+        highlightCircleAnimatable.animateTo(
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1000, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Restart,
+            )
+        )
+    }
 
-  // Tap target circle
-  LaunchedEffect(tapTarget) {
-    tapTargetCircleAnimatable.animateTo(
-      targetValue = 1f,
-      animationSpec = infiniteRepeatable(
-        animation = tween(500, easing = FastOutLinearInEasing),
-        repeatMode = RepeatMode.Reverse,
-      )
-    )
-  }
+    // Tap target circle
+    LaunchedEffect(tapTarget) {
+        tapTargetCircleAnimatable.animateTo(
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(500, easing = FastOutLinearInEasing),
+                repeatMode = RepeatMode.Reverse,
+            )
+        )
+    }
 
-  // Text alpha
-  LaunchedEffect(tapTarget) {
-    delay(200)
-    textAlphaAnimatable.animateTo(
-      targetValue = 1f,
-      animationSpec = tween(
-        durationMillis = 300,
-        easing = FastOutSlowInEasing,
-      ),
-    )
-  }
+    // Text alpha
+    LaunchedEffect(tapTarget) {
+        delay(200)
+        textAlphaAnimatable.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(
+                durationMillis = 300,
+                easing = FastOutSlowInEasing,
+            ),
+        )
+    }
 }
 
 @Composable
 private fun AnimateOut(
-  tapTarget: TapTarget,
-  outerCircleAnimatable: Animatable<Float, AnimationVector1D>,
-  highlightCircleAnimatable: Animatable<Float, AnimationVector1D>,
-  textAlphaAnimatable: Animatable<Float, AnimationVector1D>
+    tapTarget: TapTarget,
+    outerCircleAnimatable: Animatable<Float, AnimationVector1D>,
+    highlightCircleAnimatable: Animatable<Float, AnimationVector1D>,
+    textAlphaAnimatable: Animatable<Float, AnimationVector1D>
 ) {
-  // Outer circle
-  LaunchedEffect(tapTarget) {
-    outerCircleAnimatable.animateTo(
-      targetValue = 0f,
-      animationSpec = tween(
-        durationMillis = 300,
-        easing = FastOutSlowInEasing,
-      ),
-    )
-  }
+    // Outer circle
+    LaunchedEffect(tapTarget) {
+        outerCircleAnimatable.animateTo(
+            targetValue = 0f,
+            animationSpec = tween(
+                durationMillis = 300,
+                easing = FastOutSlowInEasing,
+            ),
+        )
+    }
 
-  // Highlight circle
-  LaunchedEffect(tapTarget) {
-    highlightCircleAnimatable.animateTo(
-      targetValue = 0f,
-      animationSpec = tween(
-        durationMillis = 300,
-        easing = FastOutSlowInEasing,
-      )
-    )
-  }
+    // Highlight circle
+    LaunchedEffect(tapTarget) {
+        highlightCircleAnimatable.animateTo(
+            targetValue = 0f,
+            animationSpec = tween(
+                durationMillis = 300,
+                easing = FastOutSlowInEasing,
+            )
+        )
+    }
 
-  // Text alpha
-  LaunchedEffect(tapTarget) {
-    textAlphaAnimatable.animateTo(
-      targetValue = 0f,
-      animationSpec = tween(
-        durationMillis = 300,
-        easing = FastOutSlowInEasing,
-      ),
-    )
-  }
+    // Text alpha
+    LaunchedEffect(tapTarget) {
+        textAlphaAnimatable.animateTo(
+            targetValue = 0f,
+            animationSpec = tween(
+                durationMillis = 300,
+                easing = FastOutSlowInEasing,
+            ),
+        )
+    }
 }
 
 /**
@@ -466,80 +504,80 @@ private fun AnimateOut(
  */
 @Composable
 private fun Overlay(
-  key: Any?,
-  content: @Composable () -> Unit
+    key: Any?,
+    content: @Composable () -> Unit
 ) {
-  val context = LocalContext.current
-  val activity = context.getActivity()
-  if (activity == null) {
-    Log.d(LOG_TAG, "Can't show overlay, activity is null")
-    return
-  }
-
-  val decor = activity.window.decorView as? ViewGroup
-  if (decor == null) {
-    Log.d(LOG_TAG, "Can't show overlay, decor is null")
-    return
-  }
-
-  val layoutParams = ViewGroup.LayoutParams(
-    ViewGroup.LayoutParams.MATCH_PARENT,
-    ViewGroup.LayoutParams.MATCH_PARENT
-  )
-
-  // We want the overlay to be always rendered above the entire content of the app.
-  // To do this we need to access the decor view of the activity and add our overlay to it.
-  // Otherwise the tap target rendering would be limited to the size of the [TapTargetCoordinator].
-  DisposableEffect(key) {
-    val composeView = ComposeView(context).apply {
-      setContent { content() }
+    val context = LocalContext.current
+    val activity = context.getActivity()
+    if (activity == null) {
+        Log.d(LOG_TAG, "Can't show overlay, activity is null")
+        return
     }
-    decor.addView(composeView, layoutParams)
 
-    onDispose {
-      decor.removeView(composeView)
+    val decor = activity.window.decorView as? ViewGroup
+    if (decor == null) {
+        Log.d(LOG_TAG, "Can't show overlay, decor is null")
+        return
     }
-  }
+
+    val layoutParams = ViewGroup.LayoutParams(
+        ViewGroup.LayoutParams.MATCH_PARENT,
+        ViewGroup.LayoutParams.MATCH_PARENT
+    )
+
+    // We want the overlay to be always rendered above the entire content of the app.
+    // To do this we need to access the decor view of the activity and add our overlay to it.
+    // Otherwise the tap target rendering would be limited to the size of the [TapTargetCoordinator].
+    DisposableEffect(key) {
+        val composeView = ComposeView(context).apply {
+            setContent { content() }
+        }
+        decor.addView(composeView, layoutParams)
+
+        onDispose {
+            decor.removeView(composeView)
+        }
+    }
 }
 
 private fun Context.getActivity(): Activity? = when (this) {
-  is Activity -> this
-  is ContextWrapper -> baseContext.getActivity()
-  else -> null
+    is Activity -> this
+    is ContextWrapper -> baseContext.getActivity()
+    else -> null
 }
 
 @Composable
 private fun TextDefinition.rememberMeasure(
-  textMeasurer: TextMeasurer,
-  constraints: Constraints
+    textMeasurer: TextMeasurer,
+    constraints: Constraints
 ): TextLayoutResult {
-  return remember(
-    text,
-    constraints,
-    style.color,
-    style.fontSize,
-    style.fontWeight,
-    style.textAlign,
-    style.lineHeight,
-    style.fontFamily,
-    style.textDecoration,
-    style.fontStyle,
-    style.letterSpacing
-  ) {
-    textMeasurer.measure(
-      AnnotatedString(text),
-      constraints = constraints,
-      style = TextStyle(
-        color = style.color,
-        fontSize = style.fontSize,
-        fontWeight = style.fontWeight,
-        textAlign = style.textAlign,
-        lineHeight = style.lineHeight,
-        fontFamily = style.fontFamily,
-        textDecoration = style.textDecoration,
-        fontStyle = style.fontStyle,
-        letterSpacing = style.letterSpacing
-      )
-    )
-  }
+    return remember(
+        text,
+        constraints,
+        style.color,
+        style.fontSize,
+        style.fontWeight,
+        style.textAlign,
+        style.lineHeight,
+        style.fontFamily,
+        style.textDecoration,
+        style.fontStyle,
+        style.letterSpacing
+    ) {
+        textMeasurer.measure(
+            AnnotatedString(text),
+            constraints = constraints,
+            style = TextStyle(
+                color = style.color,
+                fontSize = style.fontSize,
+                fontWeight = style.fontWeight,
+                textAlign = style.textAlign,
+                lineHeight = style.lineHeight,
+                fontFamily = style.fontFamily,
+                textDecoration = style.textDecoration,
+                fontStyle = style.fontStyle,
+                letterSpacing = style.letterSpacing
+            )
+        )
+    }
 }
