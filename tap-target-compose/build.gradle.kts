@@ -1,6 +1,7 @@
 import com.psoffritti.taptargetcompose.Configuration
 
 plugins {
+  id("maven-publish")
   alias(libs.plugins.android.library)
   alias(libs.plugins.jetbrains.kotlin.android)
 }
@@ -40,12 +41,3 @@ dependencies {
   implementation(libs.androidx.compose.ui.tooling.preview)
   implementation(libs.androidx.compose.ui.tooling)
 }
-
-extra.apply {
-  set("PUBLISH_GROUP_ID", "com.pierfrancescosoffritti.taptargetcompose")
-  set("PUBLISH_ARTIFACT_ID", "core")
-  set("PUBLISH_VERSION", Configuration.versionName)
-  set("PUBLISH_DESCRIPTION", "A compose implementation of Material Design tap targets, for feature discovery.")
-}
-
-apply(from = "../scripts/publish-module.gradle")
