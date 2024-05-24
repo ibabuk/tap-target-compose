@@ -1,9 +1,19 @@
+#### \<Advertisement\>
+
+#### [:mega: Use AI to manage your app's reviews on Google Play :arrow_right:](https://playstorereply.com) 
+Increase your apps ratings. Engage with all users, no more unanswered reviews.
+Save time and increase customer satisfaction.
+
+#### \</Advertisement\>
+
 # tap-target-compose
 tap-target-compose is a Jetpack Compose implementation of the [Material Design tap targets](https://m1.material.io/growth-communications/feature-discovery.html#feature-discovery-design), used for feature discovery.
 
 This library was inspired by its View counterpart, [TapTargetView](https://github.com/KeepSafe/TapTargetView).
 
-<img src="/.github/tap-target-image.gif" width="280" alt="screenshot"/>
+|     |     |
+| --- | --- |
+| ![](/.github/tap-target-image.gif) | [![](/.github/green-stash.gif)](https://github.com/Pool-Of-Tears/GreenStash) |
 
 # Sample app
 This library comes with a sample app that shows examples of how to use it.
@@ -21,7 +31,7 @@ Add this to your module level `build.gradle` file to start using the library.
 
 ```gradle
 dependencies {
-  implementation "com.pierfrancescosoffritti.taptargetcompose:core:1.0.0"
+  implementation "com.pierfrancescosoffritti.taptargetcompose:core:1.1.2"
 }
 ```
 
