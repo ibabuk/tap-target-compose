@@ -85,8 +85,6 @@ internal fun TapTarget(tapTarget: TapTarget, onComplete: () -> Unit) {
         LocalConfiguration.current.screenHeightDp * density.density
     )
 
-    val targetRectPx = tapTarget.coordinates.boundsInWindow()
-
     var lastTargetCenter by remember { mutableStateOf(Offset.Zero) }
     // For moving targets, the coordinates can change, use a function
     // to always get the latest.
